@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatAI Interface</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --input-bg: #f0f0f0;
+            --chat-user-bg: #e1e1e1;
+            --chat-ai-bg: #f0f0f0;
+            --timing-color: #888888;
+        }
+
+        .dark-mode {
+            --bg-color: #1a1a1a;
+            --text-color: #ffffff;
+            --input-bg: #2a2a2a;
+            --chat-user-bg: #2a2a2a;
+            --chat-ai-bg: #3a3a3a;
+            --timing-color: #aaaaaa;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background-color: var(--bg-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .logo img {
+            width: 200px;
+            height: auto;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .dark-mode-toggle {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        main {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 1rem;
+        }
+
+        #chat-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            max-height: calc(100vh - 200px);
+            padding: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 0.5rem;
+            /* background-color: var(--input-bg); */
+        }
+
+        .chat-bubble {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .user-bubble {
+            background-color: var(--chat-user-bg);
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .ai-bubble {
+            background-color: var(--chat-ai-bg);
+            align-self: flex-start;
+            margin-right: auto;
+            position: relative;
+        }
+
+        .inference-time {
+            position: absolute;
+            bottom: 0.2rem;
+            right: 0.5rem;
+            font-size: 0.7rem;
+            color: var(--timing-color);
+        }
+
+        #user-input {
+            display: flex;
+            margin-top: auto;
+        }
+
+        #user-input input {
+            flex-grow: 1;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 0.5rem;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+        }
+
+        #user-input button {
+            padding: 0.8rem 1.2rem;
+            margin-left: 0.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            background-color: #4a90e2;
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="logo">
+            <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/gi-venture-logo33-5w5w8FNtaApF3D0BS9ltwtRPPDXq9h.png"
+                alt="GI Ventures Logo">
+        </div>
+        <h1>GI Ventures Chat</h1>
+        <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌓</button>
+    </header>
+    <main>
+        <div id="chat-container"></div>
+        <form id="user-input" onsubmit="handleSubmit(event)">
+            <input type="text" placeholder="Type your message here..." required>
+            <button type="submit">Send</button>
+        </form>
+    </main>
+
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            const input = event.target.querySelector('input');
+            const message = input.value.trim();
+            if (message) {
+                // Add user bubble
+                addChatBubble('user', message);
+                input.value = '';
+
+                // Add "Typing..." bubble
+                const loadingBubble = addChatBubble('ai', "Typing...");
+
+                try {
+                    const startTime = performance.now();
+                    const response = await fetch('/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: message }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+
+                    const endTime = performance.now();
+                    const data = await response.json();
+
+                    const timeTaken = ((endTime - startTime) / 1000).toFixed(2);
+
+                    // Remove "Typing..." bubble and add AI's response
+                    loadingBubble.remove();
+                    addChatBubble('ai', data.answer || "No answer provided.", timeTaken);
+                } catch (error) {
+                    // Remove "Typing..." bubble and show error
+                    loadingBubble.remove();
+                    addChatBubble('ai', "Server did not respond. Please try again later.");
+                }
+            }
+        }
+
+        function addChatBubble(type, message, timeTaken = null) {
+            const chatContainer = document.getElementById('chat-container');
+            const bubble = document.createElement('div');
+            bubble.classList.add('chat-bubble', `${type}-bubble`);
+            bubble.textContent = message;
+
+            if (type === 'ai' && timeTaken) {
+                const timing = document.createElement('span');
+                timing.classList.add('inference-time');
+                timing.textContent = `${timeTaken}s`;
+                bubble.appendChild(timing);
+            }
+
+            chatContainer.appendChild(bubble);
+
+            // Smooth scroll to the bottom
+            chatContainer.scrollTo({
+                top: chatContainer.scrollHeight,
+                behavior: 'smooth',
+            });
+
+            return bubble; // Return bubble for dynamic handling (e.g., removing "Typing...")
+        }
+    </script>
+
+</body>
+
+</html>
